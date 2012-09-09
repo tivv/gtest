@@ -9,8 +9,6 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcOperations;
 
-import java.math.BigDecimal;
-
 /**
  * @author Vitalii Tymchyshyn
  */
@@ -21,7 +19,7 @@ public class PlayerDaoImpl implements PlayerDao{
     public Player getPlayer(String userName) {
         try {
             return jdbcOperations.queryForObject("select * from player where username = ?",
-                    new BeanPropertyRowMapper<Player>(),
+                    new BeanPropertyRowMapper<Player>(Player.class),
                     userName);
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("Player " + userName + " was not found");
@@ -29,8 +27,10 @@ public class PlayerDaoImpl implements PlayerDao{
     }
 
     @Override
-    public void addPlayer(String userName, BigDecimal initialBalance) {
-        throw new UnsupportedOperationException();
+    public void addPlayer(String userName) {
+        jdbcOperations.update("merge into player using (values(cast(? AS varchar(255)))) AS vals(x) " +
+                "   ON player.username = vals.x" +
+                "   WHEN NOT MATCHED THEN INSERT (username) VALUES vals.x", userName);
     }
 
     @Required @Autowired

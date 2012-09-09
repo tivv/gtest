@@ -9,5 +9,5 @@ import java.math.BigDecimal;
  */
 public interface PlayerDao {
     Player getPlayer(String userName);
-    void addPlayer(String userName, BigDecimal initialBalance);
+    void addPlayer(String userName);
 }
