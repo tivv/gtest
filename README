@@ -1,0 +1,55 @@
+1. Overview
+
+This is sample application that provides client and server for player wallet.
+The protocol between client and server is REST with JSON over HTTP(s). Server is web application,
+client is simple command line application.
+
+2. Building
+
+The application should be build with Maven2. Use "mvn install" command to build.
+After build is done, server war is located at server/target/gtest.war.
+Client is composed of multiple jars: client/target/gtest-client-1.0.jar and client/target/lib/*.jar.
+
+3. Running
+
+Server war can be run directly by calling "mvn jetty:run" from server subdirectory. This command will
+start server at port 8080 with in-memory db. You can pass -Djdbc.url=jdbc:hsqldb:file:<path> parameter
+to store database on filesystem or provide another jdbc url to use.
+Note that by default web application creates database structure at startup. You will need to disable
+this functionality by passing -Djdbc.from.scratch=false to start with database already filled.
+Another way is to deploy gtest.war to any servlet container. Same system properties can be used to
+control database location.
+
+Client can be run by calling "java -jar client/target/gtest-client-1.0.jar <Server URL> <User name>".
+It will create user if it does not exists and start generating random transactions. You can run multiple
+client either with same or different user names.
+If you wish to copy or package client, you can simply copy it's jar retaining directory structure (library jars
+must be in lib subdirectory relative to main gtest-client-1.0.jar jar).
+
+Both server and client will log it's transactions. Server in addition will output statistics once a minute.
+
+4. Protocol details
+
+Next REST endpoints are provided:
+    - /api/player/<name> - Retrieve player data with GET or ensure player is created with PUT
+    - /api/session - Create client session with POST. Session number and starting transaction id is returned
+    - /api/session/<session id>/transaction - Create transaction with POST. Username, transactionId and balanceChange
+        must be provided in JSON body; transactionId, balanceVersion, balanceChange and balanceAfterChange is returned.
+
+Note that transaction id must be started with number returned on session creation and increased for each next
+transaction. HTTP status 201 "Created" is returned for successful transaction created.
+If same id is passed, transaction is considered duplicate, database won't be changed and HTTP 200 will be returned
+with JSON response as if transaction was processed. This way, client can safely retry transaction creation in case
+of network failures. Provided simple client does not use this option and exit in case of any errors.
+Please note another statuses described below.
+
+HTTP Status codes:
+200, 201 - Action processed OK. Please see above for case where 201 is used.
+404 - Played could not be found
+409 - Invalid (too low) transaction id passed. May indicate multiple parallel requests with same session id.
+      It is recommended to open multiple sessions if there are multiple parallel request streams.
+410 - Session can't be found. This may indicate that server was restarted and so all sessions was closed.
+      If previous operation was finished with network error, this may mean that server was restarted during
+      transaction processing and it's impossible to say if it was applied or not.
+In case of errors, response body contain JSON representation of Java exception that can be parsed to retrieve
+detailed error message or stack trace.
