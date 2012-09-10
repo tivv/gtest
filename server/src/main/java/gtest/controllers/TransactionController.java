@@ -12,11 +12,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Required;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.ServletContextAware;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,10 +29,11 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Controller
 @RequestMapping(value = "/session")
-public class TransactionController extends ExceptionHandlingController {
+public class TransactionController extends ExceptionHandlingController implements ServletContextAware {
     private final AtomicLong clientCounter = new AtomicLong(System.currentTimeMillis());
     private Cache<Long, Long> clientTransactions;
     private PlayerDao playerDao;
+    private ServletContext servletContext;
 
     @Autowired
     public TransactionController(@Value("${transaction.cache.size}") int cacheSize) {
@@ -65,6 +69,9 @@ public class TransactionController extends ExceptionHandlingController {
             playerDao.addTransaction(transactionRequest.getUsername(), transactionRequest.getBalanceChange());
             clientTransactions.put(session, transactionRequest.getTransactionId());
             response.setStatus(HttpStatus.CREATED.value());
+            servletContext.log("Created " + (transactionRequest.getBalanceChange().signum() < 0 ? "OUT" : "IN")
+                    + " transaction for " + transactionRequest.getUsername() + " with sum "
+                    + transactionRequest.getBalanceChange().abs());
         } else {
             response.setStatus(HttpStatus.OK.value());
         }
@@ -76,5 +83,10 @@ public class TransactionController extends ExceptionHandlingController {
     @Required @Autowired
     public void setPlayerDao(PlayerDao playerDao) {
         this.playerDao = playerDao;
+    }
+
+    @Override
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
     }
 }
